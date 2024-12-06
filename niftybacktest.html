@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bank Nifty Backtesting Tool</title>
+    <title>NiftyBees Backtesting Tool</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
@@ -21,93 +21,90 @@
     </style>
 </head>
 <body>
-    <h1>Bank Nifty Backtesting Tool</h1>
-    <p>Enter strategy parameters and backtest on historical Bank Nifty data.</p>
+    <h1>NiftyBees Backtesting Tool</h1>
+    <p>Analyze historical data and test strategies like the Golden Cross.</p>
     
-    <label for="capital">Initial Capital (₹): </label>
-    <input type="number" id="capital" value="100000" /><br><br>
-    
-    <label for="entry">Entry Point (% above close): </label>
-    <input type="number" id="entry" step="0.1" value="1.0" /><br><br>
-    
-    <label for="exit">Exit Point (% below high): </label>
-    <input type="number" id="exit" step="0.1" value="1.0" /><br><br>
-    
-    <button id="backtestButton">Run Backtest</button>
+    <label for="fileUpload">Upload Historical Data (CSV): </label>
+    <input type="file" id="fileUpload" accept=".csv"><br><br>
+
+    <button id="runBacktest">Run Backtest</button>
 
     <div id="results">
-        <h2>Backtest Results</h2>
-        <p id="profitLoss">Profit/Loss: ₹0</p>
+        <h2>Results</h2>
+        <p id="summary">No data yet.</p>
         <canvas id="chart"></canvas>
     </div>
 
     <script>
-        document.getElementById('backtestButton').addEventListener('click', async function () {
-            const capital = parseFloat(document.getElementById('capital').value);
-            const entry = parseFloat(document.getElementById('entry').value);
-            const exit = parseFloat(document.getElementById('exit').value);
+        document.getElementById('runBacktest').addEventListener('click', async () => {
+            const fileInput = document.getElementById('fileUpload');
+            if (!fileInput.files[0]) {
+                alert("Please upload a CSV file containing historical data.");
+                return;
+            }
 
-            // Example static data: Historical Bank Nifty daily close prices
-            const historicalData = [
-                { date: '2024-12-01', close: 45000, high: 45500 },
-                { date: '2024-12-02', close: 45200, high: 45700 },
-                { date: '2024-12-03', close: 45600, high: 46000 },
-                { date: '2024-12-04', close: 45300, high: 45800 },
-                // Add more data here
-            ];
+            const file = fileInput.files[0];
+            const text = await file.text();
+            const rows = text.split("\n").slice(1).map(row => row.split(","));
+            
+            const data = rows.map(r => ({
+                date: r[0],
+                close: parseFloat(r[4]), // Assuming Close price is in column 4
+            }));
 
-            let balance = capital;
-            const trades = [];
+            // Calculate Moving Averages
+            const sma = (arr, n) => arr.map((_, i, a) =>
+                i >= n - 1 ? a.slice(i - n + 1, i + 1).reduce((sum, val) => sum + val.close, 0) / n : null
+            );
+            const sma50 = sma(data, 50);
+            const sma200 = sma(data, 200);
 
-            historicalData.forEach(day => {
-                const entryPrice = day.close * (1 + entry / 100);
-                const exitPrice = day.high * (1 - exit / 100);
-
-                if (entryPrice <= day.high) {
-                    const profit = exitPrice - entryPrice;
-                    balance += profit;
-                    trades.push({ date: day.date, profit });
+            // Strategy: Golden Cross
+            const strategy = [];
+            let invested = false, balance = 0, units = 0;
+            for (let i = 0; i < data.length; i++) {
+                if (sma50[i] && sma200[i]) {
+                    if (!invested && sma50[i] > sma200[i]) {
+                        // Buy signal
+                        units = balance / data[i].close || 100; // Invest Rs. 100 initially
+                        balance = 0;
+                        invested = true;
+                    } else if (invested && sma50[i] < sma200[i]) {
+                        // Sell signal
+                        balance = units * data[i].close;
+                        units = 0;
+                        invested = false;
+                    }
                 }
-            });
+                strategy.push(balance + units * data[i]?.close || 0);
+            }
 
-            const totalProfit = balance - capital;
-
-            // Update UI
-            document.getElementById('profitLoss').textContent = `Profit/Loss: ₹${totalProfit.toFixed(2)}`;
-
-            // Chart the profits
+            // Visualization
             const ctx = document.getElementById('chart').getContext('2d');
-            const dates = trades.map(trade => trade.date);
-            const profits = trades.map(trade => trade.profit);
-
             new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: dates,
-                    datasets: [{
-                        label: 'Daily Profit/Loss',
-                        data: profits,
-                        borderColor: 'green',
-                        backgroundColor: 'rgba(0, 255, 0, 0.2)',
-                    }]
+                    labels: data.map(d => d.date),
+                    datasets: [
+                        { label: "Close Price", data: data.map(d => d.close), borderColor: "blue", fill: false },
+                        { label: "Strategy Value", data: strategy, borderColor: "green", fill: false }
+                    ]
                 },
                 options: {
                     responsive: true,
                     plugins: {
-                        legend: {
-                            display: true,
-                        }
+                        legend: { display: true },
                     },
                     scales: {
-                        x: {
-                            title: { display: true, text: 'Date' },
-                        },
-                        y: {
-                            title: { display: true, text: 'Profit/Loss (₹)' },
-                        }
+                        x: { title: { display: true, text: "Date" } },
+                        y: { title: { display: true, text: "Value (₹)" } }
                     }
                 }
             });
+
+            // Summary
+            const profit = strategy[strategy.length - 1] - 100; // Assuming Rs. 100 initial investment
+            document.getElementById('summary').textContent = `Profit/Loss: ₹${profit.toFixed(2)}`;
         });
     </script>
 </body>
