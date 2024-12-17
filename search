@@ -1,0 +1,5 @@
+<script>
+        let msg = "this is case sensitive";
+        let pos = msg.search(/Case/i);
+        console.log(pos)
+    </script>
