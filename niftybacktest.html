@@ -73,9 +73,7 @@
                         invested = false;
                     }
                 }
-                strategy.push(balance + units * data[i]?.close || 0);
-            }
-
+                strategy.push(balance + units * data[i]?.close || 0)
             // Visualization
             const ctx = document.getElementById('chart').getContext('2d');
             new Chart(ctx, {
