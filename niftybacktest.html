@@ -42,7 +42,7 @@ okhihi7<!DOCTYPE html>
             const rows = text.split("\n").slice(1).map(row => row.split(","));
             
             const data = rows.map(r => ({
-                date: r[0],
+                
                 close: parseFloat(r[4]), // Assuming Close price is in column 4
             }));
 
